@@ -1,0 +1,768 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Color 专业调色系统 | Pro Color Matcher</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            color: #fff;
+            font-family: system-ui, sans-serif;
+        }
+        body {
+            background: #11141b;
+            min-height: 100vh;
+            padding-bottom: 120px;
+        }
+        .container {
+            max-width: 480px;
+            margin: 0 auto;
+            padding: 10px;
+        }
+        .top-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom:10px;
+        }
+        .lang-btn,.cam-switch,.snap-btn,.save-pre,.show-history {
+            padding:6px 10px;
+            background:#444;
+            border:none;
+            border-radius:4px;
+            font-size:13px;
+        }
+        .tool-row{
+            display:flex;
+            gap:6px;
+            flex-wrap:wrap;
+            margin:8px 0;
+        }
+        /* 摄像头预览区域 - 固定尺寸，打开前后画面不变形 */
+        .cam-wrap {
+            position: relative;
+            width: 100%;
+            height: 270px; /* 固定高度，解决画面跳动变大 */
+            background: #000;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        #video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover; /* 保持比例不变形 */
+            display: block;
+        }
+        #canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+        /* 操作按钮 */
+        .btn-bar {
+            display: flex;
+            gap: 8px;
+            margin: 12px 0;
+        }
+        button {
+            flex: 1;
+            padding: 10px;
+            border: none;
+            border-radius: 6px;
+            font-size: 15px;
+        }
+        button.stop { background: #dc2626; }
+        button.lock { background: #059669; }
+        button.open-cam{background:#2563eb;}
+        /* 提示文字 */
+        .tip-box {
+            background: #1e2430;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 12px;
+        }
+        .tip-box p {
+            line-height: 1.6;
+            color: #ccc;
+        }
+        /* 6色颜料网格 - 修复布局：第一行红黄蓝 第二行黑白绿 */
+        .ratio-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 8px;
+            margin: 15px 0;
+        }
+        .color-item {
+            background: #1e2430;
+            padding: 8px;
+            border-radius: 8px;
+        }
+        .color-name {
+            font-size: 13px;
+            margin-bottom: 4px;
+            color: #aaa;
+        }
+        .color-val {
+            font-size: 18px;
+            color: #60a5fa;
+            font-weight: bold;
+        }
+        .bar {
+            height: 5px;
+            background: #333;
+            border-radius: 3px;
+            margin-top:6px;
+            overflow:hidden;
+        }
+        .bar-fill-red { background: #ef4444; height: 100%; }
+        .bar-fill-yellow { background: #eab308; height: 100%; }
+        .bar-fill-blue { background: #3b82f6; height: 100%; }
+        .bar-fill-black { background: #222; height: 100%; }
+        .bar-fill-white { background: #f1f1f1; height: 100%; }
+        .bar-fill-green { background: #22c55e; height: 100%; }
+        /* RGB输入 */
+        .rgb-input {
+            display: flex;
+            gap: 8px;
+            margin: 10px 0;
+        }
+        .rgb-input input {
+            flex: 1;
+            background: #1e2430;
+            border: 1px solid #333;
+            padding: 10px;
+            border-radius: 6px;
+            font-size: 16px;
+        }
+        .color-preview {
+            width: 100%;
+            height: 30px;
+            border-radius: 6px;
+            margin: 8px 0;
+        }
+        /* 预设弹窗 */
+        .modal{
+            position:fixed;
+            top:0;left:0;right:0;bottom:0;
+            background:rgba(0,0,0,0.8);
+            display:none;
+            align-items:center;
+            justify-content:center;
+            z-index:99;
+            padding:20px;
+        }
+        .modal-box{
+            background:#1e2430;
+            width:100%;
+            max-width:400px;
+            border-radius:8px;
+            padding:15px;
+        }
+        .preset-list{
+            max-height:200px;
+            overflow-y:auto;
+            margin:10px 0;
+        }
+        .preset-item{
+            display:flex;
+            justify-content:space-between;
+            padding:8px;
+            border-bottom:1px solid #333;
+            align-items:center;
+        }
+        .preset-name{
+            flex:1;
+        }
+        .preset-del{
+            background:#992222;
+            border:none;
+            padding:4px 8px;
+            border-radius:4px;
+        }
+        .modal-btns{
+            display:flex;
+            gap:8px;
+            margin-top:10px;
+        }
+        .modal-btns button{
+            flex:1;
+        }
+        /* 历史记录面板 */
+        .history-panel{
+            margin-top:20px;
+            background:#1e2430;
+            border-radius:8px;
+            padding:12px;
+        }
+        .history-item{
+            padding:8px 0;
+            border-bottom:1px solid #333;
+            font-size:14px;
+            color:#ccc;
+        }
+        .history-empty{
+            color:#777;
+            text-align:center;
+            padding:10px;
+        }
+        /* 截图下载 */
+        #snap-canvas{
+            display:none;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <!-- 顶部标题与语言切换 -->
+    <div class="top-bar">
+        <h2 id="pageTitle">Color 专业调色系统</h2>
+        <button class="lang-btn" id="switchLang">English</button>
+    </div>
+
+    <!-- 工具快捷栏：切摄像头、截图、保存预设、历史 -->
+    <div class="tool-row">
+        <button class="cam-switch" id="switchCam" data-zh="切换前后置" data-en="Switch Cam">切换前后置</button>
+        <button class="snap-btn" id="snapShot" data-zh="截图保存" data-en="Screenshot">截图保存</button>
+        <button class="save-pre" id="openPresetModal" data-zh="调色预设" data-en="Presets">调色预设</button>
+        <button class="show-history" id="toggleHistory" data-zh="历史记录" data-en="History">历史记录</button>
+    </div>
+
+    <!-- 主操作按钮 -->
+    <div class="btn-bar">
+        <button id="openCam" class="open-cam" data-zh="打开摄像头" data-en="Open Camera">打开摄像头</button>
+        <button id="stopCam" class="stop" data-zh="停止" data-en="Stop">停止</button>
+        <button id="lockTarget" class="lock" data-zh="锁定目标色" data-en="Lock Target Color">锁定目标色</button>
+    </div>
+
+    <!-- 摄像头画面 - 固定高度不变形 -->
+    <div class="cam-wrap">
+        <video id="video" autoplay playsinline muted></video>
+        <canvas id="canvas"></canvas>
+    </div>
+    <canvas id="snap-canvas"></canvas>
+
+    <!-- 匹配度&提示 -->
+    <div class="tip-box">
+        <p><span data-zh="匹配度ΔE：" data-en="Delta E:">匹配度ΔE：</span><span id="deltaE">0</span> <span id="diffTip" data-zh="（差值越大色差越大）" data-en="(Higher = bigger difference)"></span></p>
+        <p id="suggest" data-zh="请打开摄像头并锁定目标色" data-en="Please open camera and lock target color">请打开摄像头并锁定目标色</p>
+    </div>
+
+    <!-- 6色颜料通道 - 修复顺序：第一行红、黄、蓝 | 第二行黑、白、绿 -->
+    <div class="ratio-grid">
+        <!-- 第一行 -->
+        <div class="color-item">
+            <div class="color-name" data-zh="红 PR254" data-en="Red PR254">红 PR254</div>
+            <div class="color-val" id="redRatio">0.00%</div>
+            <div class="bar"><div class="bar-fill-red" id="redBar" style="width:0%"></div></div>
+        </div>
+        <div class="color-item">
+            <div class="color-name" data-zh="黄 PY109" data-en="Yellow PY109">黄 PY109</div>
+            <div class="color-val" id="yellowRatio">0.00%</div>
+            <div class="bar"><div class="bar-fill-yellow" id="yellowBar" style="width:0%"></div></div>
+        </div>
+        <div class="color-item">
+            <div class="color-name" data-zh="蓝 PB15" data-en="Blue PB15">蓝 PB15</div>
+            <div class="color-val" id="blueRatio">0.00%</div>
+            <div class="bar"><div class="bar-fill-blue" id="blueBar" style="width:0%"></div></div>
+        </div>
+        <!-- 第二行 -->
+        <div class="color-item">
+            <div class="color-name" data-zh="黑 PBk7" data-en="Black PBk7">黑 PBk7</div>
+            <div class="color-val" id="blackRatio">0.00%</div>
+            <div class="bar"><div class="bar-fill-black" id="blackBar" style="width:0%"></div></div>
+        </div>
+        <div class="color-item">
+            <div class="color-name" data-zh="白 PW6" data-en="White PW6">白 PW6</div>
+            <div class="color-val" id="whiteRatio">0.00%</div>
+            <div class="bar"><div class="bar-fill-white" id="whiteBar" style="width:0%"></div></div>
+        </div>
+        <div class="color-item">
+            <div class="color-name" data-zh="绿 PG7" data-en="Green PG7">绿 PG7</div>
+            <div class="color-val" id="greenRatio">0.00%</div>
+            <div class="bar"><div class="bar-fill-green" id="greenBar" style="width:0%"></div></div>
+        </div>
+    </div>
+
+    <!-- 手动RGB目标设置 -->
+    <p data-zh="目标色 RGB" data-en="Target RGB">目标色 RGB</p>
+    <div class="rgb-input">
+        <input type="number" id="rIn" placeholder="R" min="0" max="255" value="74">
+        <input type="number" id="gIn" placeholder="G" min="0" max="255" value="65">
+        <input type="number" id="bIn" placeholder="B" min="0" max="255" value="42">
+    </div>
+    <div class="color-preview" id="targetColorPreview" style="background:rgb(74,65,42)"></div>
+
+    <!-- 历史记录面板 -->
+    <div class="history-panel" id="historyPanel">
+        <h3 data-zh="调色历史记录" data-en="Mix History">调色历史记录</h3>
+        <div id="historyList" class="preset-list"></div>
+    </div>
+</div>
+
+<!-- 预设弹窗 -->
+<div class="modal" id="presetModal">
+    <div class="modal-box">
+        <h3 data-zh="调色预设库" data-en="Mix Presets">调色预设库</h3>
+        <div class="preset-list" id="presetList"></div>
+        <input type="text" id="newPresetName" placeholder="预设名称 / Preset Name" style="width:100%;padding:8px;margin:8px 0;background:#333;border:none;border-radius:4px;">
+        <div class="modal-btns">
+            <button id="saveNewPreset" data-zh="保存当前为预设" data-en="Save Current">保存当前为预设</button>
+            <button id="closePresetModal" style="background:#666" data-zh="关闭" data-en="Close">关闭</button>
+        </div>
+    </div>
+</div>
+
+<script>
+// ====================== 1. 多语言配置 ======================
+const langPack = {
+    zh:{
+        title:"Color 专业调色系统",
+        switchBtn:"English",
+        deltaEText:"匹配度ΔE：",
+        diffTip:"（差值越大色差越大）",
+        initTip:"请打开摄像头并锁定目标色",
+        tipLessRed:"先加红：红色不足，少量多次添加",
+        tipMoreRed:"减红：当前红色偏重",
+        tipLessYellow:"加黄：黄色偏少",
+        tipMoreYellow:"减黄：黄色偏重",
+        tipLessBlue:"加蓝：蓝色不足",
+        tipMoreBlue:"减蓝：蓝色过重",
+        tipLessGreen:"加绿：绿色不足",
+        tipMoreGreen:"减绿：绿色偏重",
+        tipLessBlack:"加黑：明度偏高",
+        tipMoreBlack:"减黑：颜色过暗",
+        tipLessWhite:"加白：颜色偏深",
+        tipMoreWhite:"减白：颜色过亮",
+        tipFine:"色差很小，轻微微调即可",
+        rgbLabel:"目标色 RGB",
+        redName:"红 PR254",
+        yellowName:"黄 PY109",
+        blueName:"蓝 PB15",
+        greenName:"绿 PG7",
+        blackName:"黑 PBk7",
+        whiteName:"白 PW6",
+        targetText:"目标",
+        currentText:"当前",
+        openCam:"打开摄像头",
+        stop:"停止",
+        lock:"锁定目标色",
+        switchCam:"切换前后置",
+        snapShot:"截图保存",
+        presetBtn:"调色预设",
+        historyBtn:"历史记录",
+        presetTitle:"调色预设库",
+        savePreset:"保存当前为预设",
+        close:"关闭",
+        emptyPreset:"暂无保存预设",
+        emptyHistory:"暂无调色记录",
+        snapSuccess:"截图已下载",
+        lockAlert:"目标色已锁定，已存入历史记录",
+        camDenied:"权限拒绝：请允许浏览器相机权限\n⚠️本地文件file://无法使用，请用本地服务器打开",
+        savePresetEmpty:"请输入预设名称",
+        delConfirm:"确定删除该预设？",
+        errNoApi:"当前浏览器不支持摄像头API，请更换Chrome/Edge/系统浏览器",
+        errSecure:"非安全上下文，file://本地文件禁止调用摄像头，请用http://localhost服务器打开"
+    },
+    en:{
+        title:"Color Professional Mix System",
+        switchBtn:"Chinese",
+        deltaEText:"Delta E:",
+        diffTip:"(Higher = bigger difference)",
+        initTip:"Please open camera and lock target color",
+        tipLessRed:"Add red: insufficient red tone, add small amounts gradually",
+        tipMoreRed:"Reduce red: excess red",
+        tipLessYellow:"Add yellow: low yellow content",
+        tipMoreYellow:"Reduce yellow: too much yellow",
+        tipLessBlue:"Add blue: lack of blue",
+        tipMoreBlue:"Reduce blue: over-saturated blue",
+        tipLessGreen:"Add green: low green value",
+        tipMoreGreen:"Reduce green: excess green",
+        tipLessBlack:"Add black: brightness too high",
+        tipMoreBlack:"Reduce black: color too dark",
+        tipLessWhite:"Add white: color too deep",
+        tipMoreWhite:"Reduce white: over-bright",
+        tipFine:"Small delta E, minor fine-tune only",
+        rgbLabel:"Target RGB",
+        redName:"Red PR254",
+        yellowName:"Yellow PY109",
+        blueName:"Blue PB15",
+        greenName:"Green PG7",
+        blackName:"Black PBk7",
+        whiteName:"White PW6",
+        targetText:"Target",
+        currentText:"Current",
+        openCam:"Open Camera",
+        stop:"Stop",
+        lock:"Lock Target Color",
+        switchCam:"Switch Cam",
+        snapShot:"Screenshot",
+        presetBtn:"Presets",
+        historyBtn:"History",
+        presetTitle:"Mix Presets Library",
+        savePreset:"Save Current",
+        close:"Close",
+        emptyPreset:"No saved presets",
+        emptyHistory:"No mix history yet",
+        snapSuccess:"Screenshot downloaded",
+        lockAlert:"Target locked, saved to history",
+        camDenied:"Permission denied: allow camera access\n⚠️Local file file:// blocked, use localhost server",
+        savePresetEmpty:"Enter preset name first",
+        delConfirm:"Delete this preset?",
+        errNoApi:"Browser not support camera API, use Chrome/Edge",
+        errSecure:"Insecure context, file:// blocked, use localhost http server"
+    }
+};
+let currentLang = "zh";
+// 语言切换
+function switchLanguage(lang){
+    currentLang = lang;
+    const p = langPack[lang];
+    document.getElementById("pageTitle").innerText = p.title;
+    document.getElementById("switchLang").innerText = p.switchBtn;
+    document.querySelector('[data-zh="匹配度ΔE："]').innerText = p.deltaEText;
+    document.getElementById("diffTip").innerText = p.diffTip;
+    document.getElementById("suggest").innerText = p.initTip;
+    document.querySelector('[data-zh="目标色 RGB"]').innerText = p.rgbLabel;
+    document.querySelector('[data-zh="红 PR254"]').innerText = p.redName;
+    document.querySelector('[data-zh="黄 PY109"]').innerText = p.yellowName;
+    document.querySelector('[data-zh="蓝 PB15"]').innerText = p.blueName;
+    document.querySelector('[data-zh="绿 PG7"]').innerText = p.greenName;
+    document.querySelector('[data-zh="黑 PBk7"]').innerText = p.blackName;
+    document.querySelector('[data-zh="白 PW6"]').innerText = p.whiteName;
+    // 按钮
+    document.getElementById("openCam").innerText = p.openCam;
+    document.getElementById("stopCam").innerText = p.stop;
+    document.getElementById("lockTarget").innerText = p.lock;
+    document.getElementById("switchCam").innerText = p.switchCam;
+    document.getElementById("snapShot").innerText = p.snapShot;
+    document.getElementById("openPresetModal").innerText = p.presetBtn;
+    document.getElementById("toggleHistory").innerText = p.historyBtn;
+    document.querySelector("#presetModal h3").innerText = p.presetTitle;
+    document.getElementById("saveNewPreset").innerText = p.savePreset;
+    document.getElementById("closePresetModal").innerText = p.close;
+    document.querySelector("#historyPanel h3").innerText = p.historyBtn;
+}
+document.getElementById("switchLang").onclick = ()=>switchLanguage(currentLang==="zh"?"en":"zh");
+
+// ====================== 2. CIE-Lab ΔE 精准色差算法 ======================
+function rgbToLab(r,g,b){
+    r /=255; g/=255; b/=255;
+    r = r>0.04045 ? Math.pow((r+0.055)/1.055,2.4) : r/12.92;
+    g = g>0.04045 ? Math.pow((g+0.055)/1.055,2.4) : g/12.92;
+    b = b>0.04045 ? Math.pow((b+0.055)/1.055,2.4) : b/12.92;
+    let x = r*0.4124 + g*0.3576 + b*0.1805;
+    let y = r*0.2127 + g*0.7152 + b*0.0722;
+    let z = r*0.0193 + g*0.1192 + b*0.9503;
+    x /= 0.95047; y /=1.00000; z /=1.08883;
+    x = x>0.008856 ? Math.cbrt(x) : (7.787*x)+(16/116);
+    y = y>0.008856 ? Math.cbrt(y) : (7.787*y)+(16/116);
+    z = z>0.008856 ? Math.cbrt(z) : (7.787*z)+(16/116);
+    const L = (116*y)-16;
+    const a = 500*(x-y);
+    const bVal = 200*(y-z);
+    return {L,a,b:bVal};
+}
+function calcDeltaE(r1,g1,b1,r2,g2,b2){
+    const lab1 = rgbToLab(r1,g1,b1);
+    const lab2 = rgbToLab(r2,g2,b2);
+    const dL = lab1.L - lab2.L;
+    const da = lab1.a - lab2.a;
+    const db = lab1.b - lab2.b;
+    return Math.sqrt(dL*dL + da*da + db*db);
+}
+
+// ====================== 3. 全局变量 ======================
+const video = document.getElementById('video');
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+const snapCanvas = document.getElementById('snap-canvas');
+const snapCtx = snapCanvas.getContext('2d');
+let stream = null;
+let animId = null;
+let useFrontCam = false; // 默认后置摄像头
+// 取色框比例
+const targetBox = { x:0.16, y:0.19, w:0.12, h:0.12 };
+const currentBox = { x:0.67, y:0.19, w:0.12, h:0.12 };
+let targetRGB = { r:74, g:65, b:42 };
+let currentRGB = { r:0, g:0, b:0 };
+// 本地存储预设&历史
+let mixPresets = JSON.parse(localStorage.getItem("colorPresets") || "[]");
+let mixHistory = JSON.parse(localStorage.getItem("colorHistory") || "[]");
+
+// ====================== 4. 摄像头控制（修复画面变形） ======================
+function resizeCanvas(){
+    canvas.width = canvas.parentElement.offsetWidth;
+    canvas.height = canvas.parentElement.offsetHeight;
+}
+window.addEventListener('resize', resizeCanvas);
+// 页面加载先初始化画布尺寸
+resizeCanvas();
+
+// 打开摄像头
+document.getElementById('openCam').onclick = async ()=>{
+    const p = langPack[currentLang];
+    if(stream) return;
+    // 安全上下文检测
+    if(location.protocol === 'file:'){
+        alert(p.errSecure);
+        return;
+    }
+    // API检测
+    if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
+        alert(p.errNoApi);
+        return;
+    }
+    try{
+        stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: useFrontCam ? "user" : "environment", width:{ideal:1280} }
+        });
+        video.srcObject = stream;
+        video.style.transform = useFrontCam ? "scaleX(-1)" : "none";
+        video.onloadedmetadata = ()=>{
+            resizeCanvas();
+            loopFrame();
+        }
+    }catch(err){
+        alert(p.camDenied + "\n" + err.message);
+        console.error(err);
+    }
+}
+// 切换前后置
+document.getElementById('switchCam').onclick = async ()=>{
+    useFrontCam = !useFrontCam;
+    if(stream){
+        stream.getTracks().forEach(t=>t.stop());
+        stream = null;
+        cancelAnimationFrame(animId);
+        ctx.clearRect(0,0,canvas.width,canvas.height);
+    }
+    await document.getElementById('openCam').click();
+}
+// 停止摄像头
+document.getElementById('stopCam').onclick = ()=>{
+    if(stream){
+        stream.getTracks().forEach(t=>t.stop());
+        stream = null;
+    }
+    if(animId) cancelAnimationFrame(animId);
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+}
+
+// ====================== 5. 锁定目标色+存入历史 ======================
+document.getElementById('lockTarget').onclick = ()=>{
+    const r = Number(document.getElementById('rIn').value)||0;
+    const g = Number(document.getElementById('gIn').value)||0;
+    const b = Number(document.getElementById('bIn').value)||0;
+    targetRGB = {r,g,b};
+    document.getElementById('targetColorPreview').style.background = `rgb(${r},${g},${b})`;
+    // 写入历史记录
+    const record = {
+        time:new Date().toLocaleString(),
+        targetR:r,targetG:g,targetB:b,
+        currR:currentRGB.r,currG:currentRGB.g,currB:currentRGB.b,
+        deltaE:document.getElementById("deltaE").innerText
+    };
+    mixHistory.unshift(record);
+    if(mixHistory.length>30) mixHistory.pop(); // 最多存30条
+    localStorage.setItem("colorHistory", JSON.stringify(mixHistory));
+    renderHistory();
+    alert(langPack[currentLang].lockAlert);
+}
+
+// ====================== 6. 实时帧循环：取色+ΔE+6色配比 ======================
+function loopFrame(){
+    if(!stream) return;
+    animId = requestAnimationFrame(loopFrame);
+    const w = canvas.width;
+    const h = canvas.height;
+    ctx.clearRect(0,0,w,h);
+    const p = langPack[currentLang];
+
+    // 绘制双框
+    const tX = targetBox.x*w, tY=targetBox.y*h, tW=targetBox.w*w, tH=targetBox.h*h;
+    ctx.strokeStyle="#22dd22"; ctx.lineWidth=3; ctx.strokeRect(tX,tY,tW,tH);
+    ctx.fillStyle="#22dd22"; ctx.fillText(p.targetText, tX+5, tY+tH+18);
+
+    const cX = currentBox.x*w, cY=currentBox.y*h, cW=currentBox.w*w, cH=currentBox.h*h;
+    ctx.strokeStyle="#ffaa22"; ctx.strokeRect(cX,cY,cW,cH);
+    ctx.fillStyle="#ffaa22"; ctx.fillText(p.currentText, cX+5, cY+cH+18);
+
+    // 取当前框平均色
+    const fW=video.videoWidth, fH=video.videoHeight;
+    const sx = cX/w*fW, sy=cY/h*fH, sw=cW/w*fW, sh=cH/h*fH;
+    const tempC = document.createElement('canvas');
+    const tempCtx = tempC.getContext('2d');
+    tempC.width=sw; tempC.height=sh;
+    tempCtx.drawImage(video, sx,sy,sw,sh,0,0,sw,sh);
+    const imgData = tempCtx.getImageData(0,0,sw,sh).data;
+    let rSum=0,gSum=0,bSum=0,count=0;
+    for(let i=0;i<imgData.length;i+=4){
+        rSum+=imgData[i];gSum+=imgData[i+1];bSum+=imgData[i+2];count++;
+    }
+    currentRGB = {
+        r:Math.round(rSum/count),
+        g:Math.round(gSum/count),
+        b:Math.round(bSum/count)
+    };
+
+    // 计算ΔE
+    const de = calcDeltaE(targetRGB.r,targetRGB.g,targetRGB.b, currentRGB.r,currentRGB.g,currentRGB.b);
+    document.getElementById("deltaE").innerText = de.toFixed(2);
+
+    // 智能调色建议
+    let suggest = "";
+    const dr = targetRGB.r - currentRGB.r;
+    const dg = targetRGB.g - currentRGB.g;
+    const db = targetRGB.b - currentRGB.b;
+    if(de < 3) suggest = p.tipFine;
+    else if(dr>15) suggest=p.tipLessRed;
+    else if(dr<-15) suggest=p.tipMoreRed;
+    else if(db>15) suggest=p.tipLessBlue;
+    else if(db<-15) suggest=p.tipMoreBlue;
+    else if(dg>15) suggest=p.tipLessYellow;
+    else if(dg<-15) suggest=p.tipMoreYellow;
+    else suggest=p.tipFine;
+    document.getElementById("suggest").innerText = suggest;
+
+    // 6色颜料配比模拟
+    const redPct = (targetRGB.r/255 * 1.6).toFixed(2);
+    const yellowPct = (targetRGB.g/255 * 0.45).toFixed(2);
+    const bluePct = (targetRGB.b/255 * 0.38).toFixed(2);
+    const greenPct = ((targetRGB.g+targetRGB.b)/2/255*0.3).toFixed(2);
+    const blackPct = ((255-(targetRGB.r+targetRGB.g+targetRGB.b)/3)/255*0.8).toFixed(2);
+    const whitePct = ((targetRGB.r+targetRGB.g+targetRGB.b)/3/255*0.7).toFixed(2);
+    // 更新UI
+    document.getElementById("redRatio").innerText = redPct+"%";
+    document.getElementById("redBar").style.width = redPct+"%";
+    document.getElementById("yellowRatio").innerText = yellowPct+"%";
+    document.getElementById("yellowBar").style.width = yellowPct+"%";
+    document.getElementById("blueRatio").innerText = bluePct+"%";
+    document.getElementById("blueBar").style.width = bluePct+"%";
+    document.getElementById("blackRatio").innerText = blackPct+"%";
+    document.getElementById("blackBar").style.width = blackPct+"%";
+    document.getElementById("whiteRatio").innerText = whitePct+"%";
+    document.getElementById("whiteBar").style.width = whitePct+"%";
+    document.getElementById("greenRatio").innerText = greenPct+"%";
+    document.getElementById("greenBar").style.width = greenPct+"%";
+}
+
+// ====================== 7. 截图功能（画面+参数） ======================
+document.getElementById("snapShot").onclick = ()=>{
+    snapCanvas.width = canvas.width;
+    snapCanvas.height = canvas.height+120;
+    // 绘制摄像头画面
+    snapCtx.drawImage(video,0,0,canvas.width,canvas.height);
+    snapCtx.drawImage(canvas,0,0);
+    // 绘制底部文字参数
+    snapCtx.fillStyle="#fff"; snapCtx.font="14px system-ui";
+    const txt = currentLang==="zh"
+        ?`目标RGB:${targetRGB.r},${targetRGB.g},${targetRGB.b}  当前RGB:${currentRGB.r},${currentRGB.g},${currentRGB.b}  ΔE:${document.getElementById("deltaE").innerText}`
+        :`Target RGB:${targetRGB.r},${targetRGB.g},${targetRGB.b}  Current RGB:${currentRGB.r},${currentRGB.g},${currentRGB.b}  Delta E:${document.getElementById("deltaE").innerText}`;
+    snapCtx.fillText(txt,10, canvas.height+20);
+    // 下载图片
+    const link = document.createElement("a");
+    link.download = `Color_${new Date().getTime()}.png`;
+    link.href = snapCanvas.toDataURL("image/png");
+    link.click();
+    alert(langPack[currentLang].snapSuccess);
+}
+
+// ====================== 8. 调色预设弹窗管理 ======================
+const modal = document.getElementById("presetModal");
+document.getElementById("openPresetModal").onclick = ()=>{
+    modal.style.display="flex";
+    renderPresetList();
+}
+document.getElementById("closePresetModal").onclick = ()=> modal.style.display="none";
+// 渲染预设列表
+function renderPresetList(){
+    const listWrap = document.getElementById("presetList");
+    if(mixPresets.length===0){
+        listWrap.innerHTML = `<div style="text-align:center;color:#777;padding:10px">${langPack[currentLang].emptyPreset}</div>`;
+        return;
+    }
+    listWrap.innerHTML = "";
+    mixPresets.forEach((item,idx)=>{
+        const div = document.createElement("div");
+        div.className="preset-item";
+        div.innerHTML = `
+            <div class="preset-name">${item.name}<br><small>RGB(${item.r},${item.g},${item.b})</small></div>
+            <div style="display:flex;gap:6px">
+                <button style="background:#2563eb;padding:4px 8px;border:none;border-radius:4px" data-load="${idx}">${currentLang==="zh"?"加载":"Load"}</button>
+                <button class="preset-del" data-del="${idx}">${currentLang==="zh"?"删":"Del"}</button>
+            </div>
+        `;
+        listWrap.appendChild(div);
+    });
+    // 加载预设
+    listWrap.querySelectorAll("[data-load]").forEach(btn=>{
+        btn.onclick = ()=>{
+            const idx = Number(btn.dataset.load);
+            const p = mixPresets[idx];
+            document.getElementById("rIn").value = p.r;
+            document.getElementById("gIn").value = p.g;
+            document.getElementById("bIn").value = p.b;
+            targetRGB = {r:p.r,g:p.g,b:p.b};
+            document.getElementById("targetColorPreview").style.background = `rgb(${p.r},${p.g},${p.b})`;
+            modal.style.display="none";
+        }
+    });
+    // 删除预设
+    listWrap.querySelectorAll(".preset-del").forEach(btn=>{
+        btn.onclick = ()=>{
+            if(confirm(langPack[currentLang].delConfirm)){
+                const idx = Number(btn.dataset.del);
+                mixPresets.splice(idx,1);
+                localStorage.setItem("colorPresets", JSON.stringify(mixPresets));
+                renderPresetList();
+            }
+        }
+    });
+}
+// 保存当前为新预设
+document.getElementById("saveNewPreset").onclick = ()=>{
+    const name = document.getElementById("newPresetName").value.trim();
+    if(!name){
+        alert(langPack[currentLang].savePresetEmpty);
+        return;
+    }
+    mixPresets.push({
+        name,
+        r:targetRGB.r, g:targetRGB.g, b:targetRGB.b
+    });
+    localStorage.setItem("colorPresets", JSON.stringify(mixPresets));
+    document.getElementById("newPresetName").value = "";
+    renderPresetList();
+}
+
+// ====================== 9. 历史记录面板 ======================
+function renderHistory(){
+    const listWrap = document.getElementById("historyList");
+    if(mixHistory.length===0){
+        listWrap.innerHTML = `<div class="history-empty">${langPack[currentLang].emptyHistory}</div>`;
+        return;
+    }
+    listWrap.innerHTML = "";
+    mixHistory.forEach(item=>{
+        const div = document.createElement("div");
+        div.className="history-item";
+        div.innerHTML = `
+            <div>${item.time}</div>
+            <div>${currentLang==="zh"?"目标":"Target"}:RGB(${item.targetR},${item.targetG},${item.targetB})</div>
+            <div>${currentLang==="zh"?"当前":"Current"}:RGB(${item.currR},${item.currG},${item.currB})</div>
+            <div>ΔE:${item.deltaE}</div>
+        `;
+        listWrap.appendChild(div);
+    })
+}
+// 初始化渲染历史
+renderHistory();
+</script>
+</body>
+</html>
